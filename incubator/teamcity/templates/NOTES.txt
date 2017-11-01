@@ -1,0 +1,50 @@
+1.Wait for the service to start running
+  kubectl get pods --namespace {{ .Release.Namespace }} -l "app={{ template "..name" . }},release={{ .Release.Name }}" -w
+
+2. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http://{{ . }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "..fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch the status of by running 'kubectl get svc -w {{ template "..fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "..fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo http://$SERVICE_IP:{{ .Values.service.externalPort }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app={{ template "..name" . }},release={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:{{ .Values.service.externalPort }} to use your application"
+  kubectl port-forward $POD_NAME {{ .Values.service.externalPort }}:{{ .Values.service.internalPort }}
+
+  Please note that TeamCity needs to be accessible on its internal port and
+  you cannot use an alternative port in the port forward for the initial setup
+  to work. Once teamcity is installed you can change the server URL and port in
+  **Administration**, **Global Settings** under **Server URL**.
+{{- end }}
+
+3. Finalize the installation through the web-interface.
+
+{{- if .Values.dindagent.enabled }}
+{{- if .Values.dindagent.teamcityServerURL }}
+4. Helm has deployed a dind agent connected to {{ .Values.dindagent.teamcityServerURL }}.
+{{- else }}
+4. Configure the dind agent so it can find the TeamCity server.
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  export TEAMCITY_URL=http://{{ . }}
+{{- end }}
+{{- else if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ template "..fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  export TEAMCITY_URL=http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ template "..fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  export TEAMCITY_URL=http://$SERVICE_IP:{{ .Values.service.externalPort }}
+{{- end }}
+  helm update {{ .Release.Name }} --set="dindagent.teamcityServerURL=http://$TEAMCITY_URL"
+{{- end -}}
+{{- end }}

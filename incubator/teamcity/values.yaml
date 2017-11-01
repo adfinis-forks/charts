@@ -1,0 +1,97 @@
+# Default values for ..
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+replicaCount: 1
+image:
+  repository: jetbrains/teamcity-server
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  name: teamcity
+  type: ClusterIP
+  externalPort: 8111
+  internalPort: 8111
+ingress:
+  enabled: false
+  # Used to create an Ingress record.
+  hosts:
+    - teamcity.local
+  annotations:
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  tls:
+    # Secrets must be manually created in the namespace.
+    # - secretName: chart-example-tls
+    #   hosts:
+    #     - chart-example.local
+
+## Persist data to a persistent volume
+persistence:
+  # This should always be enabled so teamcity can intialize its local storage.
+  enabled: true
+
+  ## A manually managed Persistent Volume and Claim
+  ## Requires persistence.enabled: true
+  ## If defined, PVC must be created manually before volume will be bound
+  # existingClaim:
+
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 8Gi
+  subPath: "teamcity-data"
+
+  # Define the in container location the TeamCity PVC is mounted at
+  mountPath: /data/teamcity_server/datadir
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+# Add an agent deployment for use with teamcity-kubernetes-plugin.
+#
+# The plugin only relys on this deployment to use it as a template on how to
+# schedule the actual pods needed to run build jobs. TeamCity manages those
+# pods itself and helm only needs to run the agent deployment so that it is
+# available to TeamCity for inspection.
+agent:
+  enabled: false
+  image:
+    repository: jetbrains/teamcity-agent
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources: {}
+
+# Add a dind-agent deployment for use with teamcity-kubernetes-plugin.
+# 
+# In addition to the basic agent deploy above this creates a deploymentconfig
+# complemete with the docker command and a docker sidecare that allows you to
+# do dind.
+dindagent:
+  enabled: false
+  replicas: 1
+  # teamcityServerURL: 
+  cli:
+    image:
+      repository: jetbrains/teamcity-agent
+      tag: latest
+      pullPolicy: IfNotPresent
+  docker:
+    image:
+      repository: docker
+      tag: dind
+      pullPolicy: IfNotPresent
